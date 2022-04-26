@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <form action="" method="post">
+        {% csrf_token %}
+        <input type="text" name="gameid" placeholder="Game ID">
+        <input type="text" name="name" placeholder="Your Name">
+        <input type="submit" id="join">
+    </form>
+
+
+<!-- <script>
+    document.getElementById("join").addEventListener('click', ()=>{
+        window.location.replace(`${window.location.origin}/game/${document.getElementById("game_id").value}`)
+    })
+</script> -->
+
+
+{% endblock content %}

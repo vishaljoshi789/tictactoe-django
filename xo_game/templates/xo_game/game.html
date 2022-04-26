@@ -1,0 +1,227 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<style>
+    .board {
+        width: fit-content;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(3, 1fr);
+        grid-gap: 10px;
+    }
+
+    .board .cell {
+        border: 1px solid black;
+        width: 100px;
+        height: 100px;
+        text-align: center;
+        line-height: 100px;
+        font-size: 60px;
+        cursor: pointer;
+    }
+
+    .board .cell.x {
+        background-color: #f00;
+    }
+
+    .board .cell.o {
+        background-color: #00f;
+    }
+
+    .board .cell.empty {
+        background-color: #fff;
+    }
+
+    .board .cell.win {
+        background-color: #0f0;
+    }
+    .win-line{
+        transition: all 0.5s ease-in-out;
+        opacity: 0;
+        background-color: rgba(96, 93, 255, 0.582);
+        height: 10px;
+        border-radius: 20px;
+    }
+
+    .win-box13{
+        width: 275px;
+        transform: translate(40px, -305px) rotate(0deg);
+    }
+
+    .win-box46{
+        width: 275px;
+        transform: translate(40px, -185px) rotate(0deg);
+    }
+
+    .win-box79{
+        width: 275px;
+        transform: translate(40px, -70px) rotate(0deg);
+    }
+
+    .win-box17{
+        width: 275px;
+        transform: translate(-80px, -190px) rotate(90deg);
+    }
+
+    .win-box28{
+        width: 275px;
+        transform: translate(40px, -190px) rotate(90deg);
+    }
+
+    .win-box39{
+        width: 275px;
+        transform: translate(160px, -190px) rotate(90deg);
+    }
+
+    .win-box19{
+        width: 350px;
+        transform: translate(0px, -190px) rotate(45deg);
+    }
+
+    .win-box37{
+        width: 350px;
+        transform: translate(0px, -190px) rotate(135deg);
+    }
+</style>
+<p>Player Name = {{player}}</p>
+<p>Game Id - {{ gameid }}</p>
+
+
+
+<div class="game board">
+    <span id="box1" class="cell empty"></span>
+    <span id="box2" class="cell empty"></span>
+    <span id="box3" class="cell empty"></span>
+    <span id="box4" class="cell empty"></span>
+    <span id="box5" class="cell empty"></span>
+    <span id="box6" class="cell empty"></span>
+    <span id="box7" class="cell empty"></span>
+    <span id="box8" class="cell empty"></span>
+    <span id="box9" class="cell empty"></span>
+</div>
+
+<div id='winLine' class='win-line'></div>
+<div id="gameCells"></div>
+{{ gameid|json_script:"game_id" }}
+{{ player|json_script:"player" }}
+
+
+
+<script>
+    let win = false
+    let winArray = [
+    ["box1", "box2", "box3"],
+    ["box1", "box4", "box7"],
+    ["box1", "box5", "box9"],
+    ["box2", "box5", "box8"],
+    ["box3", "box6", "box9"],
+    ["box3", "box5", "box7"],
+    ["box4", "box5", "box6"],
+    ["box7", "box8", "box9"],
+    ];
+    let chance = "X"
+    let addWinLine = (e1, e2) => {
+        let ee1 = e1[3];
+        let ee2 = e2[3];
+        let addClass = "win-box" + ee1 + ee2;
+        document.getElementById("winLine").classList.add(addClass);
+        document.getElementById("winLine").style.opacity = 1;
+    };
+    let checkWin = (symbol='', id='') => {
+        winArray.forEach((element) => {
+            if(symbol==='' || id===''){
+                if(element.every((e) => document.getElementById(e).textContent === 'X' || document.getElementById(e).textContent === 'O')){
+                    win = true;
+                    addWinLine(element[0], element[2])
+                }
+            }
+            else{
+        if (element.includes(id)) {
+            if (
+            element.every((e) => document.getElementById(e).textContent === symbol)
+            ) {
+                console.log("won")
+            win = true;
+            addWinLine(element[0], element[2]);
+            }
+        }}
+        });
+    };
+    let cells = document.querySelectorAll(".cell")
+
+    let changeSymbol = () => {
+        if(chance === "X"){
+            chance = "O"
+        }else{
+            chance = "X"
+                }
+    }
+    
+    cells.forEach(e => {
+       e.addEventListener("click", ()=>{
+           if(!win){
+                if(e.textContent === "" && chance == player_symbol){
+                    e.textContent = chance
+                    changeSymbol()
+                    let message = {
+                        "type" : 'gamecells',
+                        "cell": e.id,
+                        "symbol": e.textContent,
+                        "turn": chance
+                    }; gameSocket.send(JSON.stringify({
+                        'message':message
+                    }))
+                    checkWin(e.textContent, e.id)
+                }
+            }
+       }) 
+    });
+
+</script>
+
+<script>
+    let gameid = JSON.parse(document.getElementById("game_id").textContent)
+    let player = JSON.parse(document.getElementById("player").textContent)
+    let url = `ws://${window.location.host}/ws/socket-server/${gameid}/`
+    let player_symbol = ''
+    let gameSocket = new WebSocket(url)
+
+    gameSocket.onopen = () => {
+        let message = {
+                    "type" : "player_name",
+                    "player": player
+                }; gameSocket.send(JSON.stringify({
+                    'message':message
+                }))
+    }
+
+    gameSocket.onmessage = function(e){
+        let data = JSON.parse(e.data)
+
+        if(data.type==='cells'){
+            document.getElementById(data.message.cell).textContent = data.message.symbol
+            checkWin(data.message.symbol,data.message.cell)
+            chance = data.message.turn
+        }
+        else if(data.type==='playerName'){
+            if (data.message.player1Name[0] == player){
+                player_symbol = data.message.player1Name[1]
+            }  
+            else if (data.message.player2Name[0] == player){
+                player_symbol = data.message.player2Name[1]
+            }  
+
+            // console.log(player_symbol)
+        }
+        else if (data.type === 'Connection'){
+            for(item in data.message){
+                document.getElementById(item).textContent = data.message[item]
+                checkWin()
+            }
+        }
+    }
+</script>
+
+
+{% endblock content %}
